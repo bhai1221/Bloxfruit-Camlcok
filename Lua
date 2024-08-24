@@ -1,0 +1,88 @@
+local ScreenGui = Instance.new("ScreenGui")
+local DragFrame = Instance.new("Frame")
+local ToggleButton = Instance.new("TextButton")
+
+ScreenGui.Parent = game:GetService("CoreGui")
+
+-- Setup DragFrame
+DragFrame.Size = UDim2.new(0, 100, 0, 50)
+DragFrame.Position = UDim2.new(0.5, -50, 0, 20)
+DragFrame.BackgroundTransparency = 0.5 -- Slight transparency to indicate drag area
+DragFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50) -- Slightly darker color for visibility
+DragFrame.Active = true -- Allow user input
+DragFrame.Draggable = true -- Make the frame draggable
+DragFrame.Parent = ScreenGui
+
+-- Setup ToggleButton
+ToggleButton.Size = UDim2.new(1, 0, 1, 0) -- Fill the DragFrame
+ToggleButton.Position = UDim2.new(0, 0, 0, 0) -- Align to the top-left corner of the DragFrame
+ToggleButton.Text = "Lock: OFF"
+ToggleButton.Parent = DragFrame
+
+local Cam = game.Workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local lockEnabled = false
+local lockedPlayer = nil
+
+local function getClosestPlayerInFOV()
+    local nearest = nil
+    local last = math.huge
+    local playerMousePos = Cam.ViewportSize / 2
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= Players.LocalPlayer then
+            local character = player.Character
+            if character then
+                local humanoidRootPart = character:FindFirstChild("UpperTorso")
+                local humanoid = character:FindFirstChild("Humanoid")
+                if humanoidRootPart and humanoid and humanoid.Health > 0 then
+                    local ePos, isVisible = Cam:WorldToViewportPoint(humanoidRootPart.Position)
+                    local distance = (Vector2.new(ePos.x, ePos.y) - playerMousePos).Magnitude
+
+                    if distance < last and isVisible then
+                        last = distance
+                        nearest = player
+                    end
+                end
+            end
+        end
+    end
+
+    return nearest
+end
+
+local function lockOntoPlayer(player)
+    local character = player.Character
+    if character then
+        local humanoidRootPart = character:FindFirstChild("UpperTorso")
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoidRootPart and humanoid and humanoid.Health > 0 then
+            local direction = (humanoidRootPart.Position - Cam.CFrame.Position).unit
+            local newCFrame = CFrame.new(Cam.CFrame.Position, Cam.CFrame.Position + direction)
+            Cam.CFrame = newCFrame
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if lockEnabled and lockedPlayer then
+        lockOntoPlayer(lockedPlayer)
+    end
+end)
+
+ToggleButton.MouseButton1Click:Connect(function()
+    if lockEnabled then
+        -- Disable lock and clear locked player
+        lockEnabled = false
+        lockedPlayer = nil
+        ToggleButton.Text = "Lock: OFF"
+    else
+        -- Enable lock and find closest player
+        lockedPlayer = getClosestPlayerInFOV()
+        if lockedPlayer then
+            lockEnabled = true
+            ToggleButton.Text = "Lock: ON"
+        end
+    end
+end)
